@@ -12,7 +12,7 @@ def get_differential_filter():
 
 def filter_image(im, filtr):
     print("Filtering Image")
-    #im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
+    im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
     if (len(im) == 0 or len(im[0]) == 0):
         print("Error: image to be filtered is too small.")
         return im
@@ -76,8 +76,54 @@ def get_gradient(im_dx, im_dy):
 
 def build_histogram(grad_mag, grad_angle, cell_size):
     # To do
-    
+    print("Building Histogram")
+    if (len(grad_mag) == 0 or len(grad_angle) == 0):
+        print("Error: gradient(s) too small")
+        empty = [[[]]]
+        return empty
 
+    im_h = len(grad_mag)
+    im_w = len(grad_mag[0])
+
+    # Get number of cells along x and y axes
+    M = math.floor(im_h/cell_size)
+    N = math.floor(im_w/cell_size)
+
+    ori_histo = []
+
+    for i in range(M):
+        ori_row = []
+        for j in range(N):
+            ori_cell = []
+            for bn in range(cell_size):
+                bin_sum = 0
+                for u in range(cell_size):
+                    for v in range(cell_size):
+                        # Check if angle within bin's angle range
+                        angle = grad_angle[u+i*cell_size][v+j*cell_size]
+                        print(angle)
+                        # make sure max is 180...
+                        if(bn == 0):
+                            if(angle >= 165 or angle < 15):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                        elif(bn == 1):
+                            if(angle < 45):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                        elif(bn == 2):
+                            if(angle < 75):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                        elif(bn == 3):
+                            if(angle < 105):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                        elif(bn == 4):
+                            if(angle < 135):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                        elif(bn == 5):
+                            if(angle < 165):
+                                bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
+                ori_cell.append(bin_sum)
+            ori_row.append(ori_cell)
+        ori_histo.append(ori_row)
 
     return ori_histo
 
@@ -100,6 +146,8 @@ def extract_hog(im):
 
     # get gradients 
     grad_mag, grad_angle = get_gradient(diff_x, diff_y)
+
+    histogram = build_histogram(grad_mag, grad_angle, 8)
 
     #visualize(grad_angle)
 
