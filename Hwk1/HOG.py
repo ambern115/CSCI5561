@@ -12,7 +12,7 @@ def get_differential_filter():
 
 def filter_image(im, filtr):
     print("Filtering Image")
-    im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
+    im = [[1,2,4,5,5],[6,1,0,1,0],[0,0,1,1,0],[8,0,2,4,9],[2,3,1,0,8]]
     if (len(im) == 0 or len(im[0]) == 0):
         print("Error: image to be filtered is too small.")
         return im
@@ -75,10 +75,13 @@ def get_gradient(im_dx, im_dy):
 
 
 def build_histogram(grad_mag, grad_angle, cell_size):
-    # To do
     print("Building Histogram")
     if (len(grad_mag) == 0 or len(grad_angle) == 0):
         print("Error: gradient(s) too small")
+        empty = [[[]]]
+        return empty
+    if (cell_size <= 0):
+        print("Error: cell_size cannot be negative or zero.")
         empty = [[[]]]
         return empty
 
@@ -91,16 +94,20 @@ def build_histogram(grad_mag, grad_angle, cell_size):
 
     ori_histo = []
 
+    # For each row
     for i in range(M):
         ori_row = []
+        # For each cell
         for j in range(N):
             ori_cell = []
-            for bn in range(cell_size):
-                bin_sum = 0
+            # For each bin
+            for bn in range(6):
+                bin_sum = 0.0
                 for u in range(cell_size):
                     for v in range(cell_size):
                         # Check if angle within bin's angle range
                         angle = grad_angle[u+i*cell_size][v+j*cell_size]
+                        angle = abs(angle*180.0/math.pi)
                         print(angle)
                         # make sure max is 180...
                         if(bn == 0):
@@ -130,6 +137,61 @@ def build_histogram(grad_mag, grad_angle, cell_size):
 
 def get_block_descriptor(ori_histo, block_size):
     # To do
+    if(block_size < 1 or block_size > len(ori_histo)):
+        print("Error: block size too small or too large.")
+        empty = [[[]]]
+        return empty
+    
+    const_squared = math.e*math.e
+
+    # Separate out the blocks
+    all_blocks = []
+    for i in range(len(ori_histo)-(block_size-1)):
+        all_blocks_row = []
+        for j in range(len(ori_histo[0])-(block_size-1)):
+            block = []
+            for u in range(block_size):
+                block_row = []
+                for v in range(block_size):
+                    # Append histogram of cell to block row
+                    block_row.append(ori_histo[i+u][j+v])
+                block.append(block_row)
+            all_blocks_row.append(block)
+        all_blocks.append(all_blocks_row)
+    
+
+    # Cancatenate the histograms of the blocks
+    
+
+    # Normalize histograms in the blocks
+
+    #For each block row
+    for i in range(len(all_blocks)):
+        # For each block...
+        for j in range(len(all_blocks[0])):
+            # For each histogram bin in this block...
+            for bn in range(6):
+                bin_sum = 0.0
+                # Sum bin for each cell in this block
+                # For each row in the block
+                for u in range(block_size):
+                    # For each cell in the block
+                    for v in range(block_size):
+                        tmp_n = all_blocks[i][j][u][v][bn]
+                        bin_sum += tmp_n*tmp_n + const_squared
+                
+                denom = math.sqrt(bin_sum)
+                # Normalize each cell in this block for this bin
+                for u in range(block_size):
+                    for v in range(block_size):
+                        normal = all_blocks[i][j][u][v][bn]/denom
+                        # Updates value in place
+                        all_blocks[i][j][u][v][bn] = normal
+              
+    ori_histo_normalized = all_blocks       
+
+    print(all_blocks)         
+
     return ori_histo_normalized
 
 
@@ -147,7 +209,11 @@ def extract_hog(im):
     # get gradients 
     grad_mag, grad_angle = get_gradient(diff_x, diff_y)
 
-    histogram = build_histogram(grad_mag, grad_angle, 8)
+    histogram = build_histogram(grad_mag, grad_angle, 2)
+
+    descriptor = get_block_descriptor(histogram,2)
+
+    visualize_hog(im, descriptor, 2, 2)
 
     #visualize(grad_angle)
 
