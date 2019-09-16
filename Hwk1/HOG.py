@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def get_differential_filter():
-    # To do
     filter_x = [[1.0,0.0,-1.0],[1.0,0.0,-1.0],[1.0,0.0,-1.0]]
     filter_y = [[1.0,1.0,1.0],[0.0,0.0,0.0],[-1.0,-1.0,-1.0]]
 
@@ -13,7 +12,7 @@ def get_differential_filter():
 
 def filter_image(im, filtr):
     print("Filtering Image")
-    #im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
+    im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
     if (len(im) == 0 or len(im[0]) == 0):
         print("Error: image to be filtered is too small.")
         return im
@@ -62,9 +61,36 @@ def filter_image(im, filtr):
 
 
 def get_gradient(im_dx, im_dy):
-    # To do
+    # Calculate the magnitude gradient
+    x_squared = np.square(im_dx)
+    y_squared = np.square(im_dy)
+    grad_mag = np.sqrt(np.add(x_squared,y_squared))
+
+    # Caluculate the angle gradient
+    non_zero_dy = zeroes_to_ones(im_dy)
+    non_zero_dx = zeroes_to_ones(im_dx)
+    divided_derivatives = np.divide(non_zero_dy, non_zero_dx)
+    grad_angle = np.arctan(divided_derivatives)
+
+    #!!! What to do when you get nan on divide???
+
     return grad_mag, grad_angle
 
+# Turns all zeroes in a matrix into ones
+# Used in get_gradient function
+def zeroes_to_ones(matrix):
+    new_matrix = []
+
+    for row in matrix:
+        new_row = []
+        for n in row:
+            if (n == 0):
+                new_row.append(1.0)
+            else:
+                new_row.append(n)
+        new_matrix.append(new_row)
+
+    return new_matrix
 
 def build_histogram(grad_mag, grad_angle, cell_size):
     # To do
@@ -86,8 +112,7 @@ def extract_hog(im):
     diff_x = filter_image(im, diff_filter_x)
     diff_y = filter_image(im, diff_filter_y)
 
-    #print(diff_x)
-    #print(diff_y)
+    get_gradient(diff_x, diff_y)
 
     # visualize to verify
     #visualize_hog(im, hog, 8, 2)
