@@ -12,7 +12,7 @@ def get_differential_filter():
 
 def filter_image(im, filtr):
     print("Filtering Image")
-    im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
+    #im = [[1,2,4,5],[6,1,0,1],[0,0,1,1],[8,0,2,4]]
     if (len(im) == 0 or len(im[0]) == 0):
         print("Error: image to be filtered is too small.")
         return im
@@ -61,39 +61,24 @@ def filter_image(im, filtr):
 
 
 def get_gradient(im_dx, im_dy):
+    print("Retrieving Gradients")
+
     # Calculate the magnitude gradient
     x_squared = np.square(im_dx)
     y_squared = np.square(im_dy)
     grad_mag = np.sqrt(np.add(x_squared,y_squared))
 
     # Caluculate the angle gradient
-    non_zero_dy = zeroes_to_ones(im_dy)
-    non_zero_dx = zeroes_to_ones(im_dx)
-    divided_derivatives = np.divide(non_zero_dy, non_zero_dx)
-    grad_angle = np.arctan(divided_derivatives)
-
-    #!!! What to do when you get nan on divide???
+    grad_angle = np.arctan2(im_dy, im_dx)
 
     return grad_mag, grad_angle
 
-# Turns all zeroes in a matrix into ones
-# Used in get_gradient function
-def zeroes_to_ones(matrix):
-    new_matrix = []
-
-    for row in matrix:
-        new_row = []
-        for n in row:
-            if (n == 0):
-                new_row.append(1.0)
-            else:
-                new_row.append(n)
-        new_matrix.append(new_row)
-
-    return new_matrix
 
 def build_histogram(grad_mag, grad_angle, cell_size):
     # To do
+    
+
+
     return ori_histo
 
 
@@ -109,18 +94,25 @@ def extract_hog(im):
 
     # get differential images
     diff_filter_x, diff_filter_y = get_differential_filter();
+
     diff_x = filter_image(im, diff_filter_x)
     diff_y = filter_image(im, diff_filter_y)
 
-    get_gradient(diff_x, diff_y)
+    # get gradients 
+    grad_mag, grad_angle = get_gradient(diff_x, diff_y)
+
+    #visualize(grad_angle)
 
     # visualize to verify
     #visualize_hog(im, hog, 8, 2)
-    visualize_hog(im, im, 8, 2)
+    #visualize_hog(im, im, 8, 2)
 
     #return hog
     return im
 
+def visualize(im):
+    plt.imshow(im, cmap='gray', vmin=0, vmax=1)
+    plt.show()
 
 # visualize histogram of each block
 def visualize_hog(im, hog, cell_size, block_size):
