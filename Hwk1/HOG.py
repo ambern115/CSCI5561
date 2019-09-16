@@ -12,7 +12,7 @@ def get_differential_filter():
 
 def filter_image(im, filtr):
     print("Filtering Image")
-    im = [[1,2,4,5,5],[6,1,0,1,0],[0,0,1,1,0],[8,0,2,4,9],[2,3,1,0,8]]
+    #im = [[1,2,4,5,5,0],[6,1,0,1,0,2],[0,0,1,1,0,1],[8,0,2,4,9,7],[2,3,1,0,8,7],[2,2,2,2,2,2]]
     if (len(im) == 0 or len(im[0]) == 0):
         print("Error: image to be filtered is too small.")
         return im
@@ -108,7 +108,6 @@ def build_histogram(grad_mag, grad_angle, cell_size):
                         # Check if angle within bin's angle range
                         angle = grad_angle[u+i*cell_size][v+j*cell_size]
                         angle = abs(angle*180.0/math.pi)
-                        print(angle)
                         # make sure max is 180...
                         if(bn == 0):
                             if(angle >= 165 or angle < 15):
@@ -145,53 +144,32 @@ def get_block_descriptor(ori_histo, block_size):
     const_squared = math.e*math.e
 
     # Separate out the blocks
-    all_blocks = []
+    ori_histo_normalized = []
     for i in range(len(ori_histo)-(block_size-1)):
-        all_blocks_row = []
+        ori_histo_row = []
+        # For each block
         for j in range(len(ori_histo[0])-(block_size-1)):
             block = []
-            for u in range(block_size):
-                block_row = []
-                for v in range(block_size):
-                    # Append histogram of cell to block row
-                    block_row.append(ori_histo[i+u][j+v])
-                block.append(block_row)
-            all_blocks_row.append(block)
-        all_blocks.append(all_blocks_row)
-    
-
-    # Cancatenate the histograms of the blocks
-    
-
-    # Normalize histograms in the blocks
-
-    #For each block row
-    for i in range(len(all_blocks)):
-        # For each block...
-        for j in range(len(all_blocks[0])):
-            # For each histogram bin in this block...
+            # For each bin
             for bn in range(6):
+                # Sum this bin for each cell in this block
                 bin_sum = 0.0
-                # Sum bin for each cell in this block
-                # For each row in the block
                 for u in range(block_size):
-                    # For each cell in the block
                     for v in range(block_size):
-                        tmp_n = all_blocks[i][j][u][v][bn]
+                        tmp_n = ori_histo[i+u][j+v][bn]
                         bin_sum += tmp_n*tmp_n + const_squared
-                
+
                 denom = math.sqrt(bin_sum)
+
                 # Normalize each cell in this block for this bin
+                # Concantenate values into one 24 elem long list
                 for u in range(block_size):
                     for v in range(block_size):
-                        normal = all_blocks[i][j][u][v][bn]/denom
-                        # Updates value in place
-                        all_blocks[i][j][u][v][bn] = normal
-              
-    ori_histo_normalized = all_blocks       
-
-    print(all_blocks)         
-
+                        normal = ori_histo[i+u][j+v][bn]/denom
+                        block.append(normal)
+            ori_histo_row.append(block)
+        ori_histo_normalized.append(ori_histo_row)
+           
     return ori_histo_normalized
 
 
@@ -209,11 +187,20 @@ def extract_hog(im):
     # get gradients 
     grad_mag, grad_angle = get_gradient(diff_x, diff_y)
 
-    histogram = build_histogram(grad_mag, grad_angle, 2)
+    histogram = build_histogram(grad_mag, grad_angle, 8)
 
     descriptor = get_block_descriptor(histogram,2)
 
-    visualize_hog(im, descriptor, 2, 2)
+    # Concantenate all block descriptors to get HOG
+    num_vals = len(descriptor)*len(descriptor[0])*24
+    hog = []
+    for row in descriptor:
+        for block_desc in row:
+            hog = np.append(hog, block_desc)
+
+    visualize_hog(im, hog, 8, 2)
+
+
 
     #visualize(grad_angle)
 
