@@ -108,7 +108,6 @@ def build_histogram(grad_mag, grad_angle, cell_size):
                         # Check if angle within bin's angle range
                         angle = grad_angle[u+i*cell_size][v+j*cell_size]
                         angle = abs(angle*180.0/math.pi)
-                        # make sure max is 180...
                         if(bn == 0):
                             if(angle >= 165 or angle < 15):
                                 bin_sum += grad_mag[u+i*cell_size][v+j*cell_size]
@@ -143,77 +142,115 @@ def get_block_descriptor(ori_histo, block_size):
     
     const_squared = math.e*math.e
 
-    # Separate out the blocks
+    oh_w = len(ori_histo)
+    oh_h = len(ori_histo)
+
     ori_histo_normalized = []
+    
+    # Build descriptor for blocks
     for i in range(len(ori_histo)-(block_size-1)):
         ori_histo_row = []
-        # For each block
         for j in range(len(ori_histo[0])-(block_size-1)):
-            block = []
-            # For each bin
-            for bn in range(6):
-                # Sum this bin for each cell in this block
-                bin_sum = 0.0
-                for u in range(block_size):
-                    for v in range(block_size):
-                        tmp_n = ori_histo[i+u][j+v][bn]
-                        bin_sum += tmp_n*tmp_n + const_squared
-
-                denom = math.sqrt(bin_sum)
-
-                # Normalize each cell in this block for this bin
-                # Concantenate values into one 24 elem long list
-                for u in range(block_size):
-                    for v in range(block_size):
-                        normal = ori_histo[i+u][j+v][bn]/denom
-                        block.append(normal)
-            ori_histo_row.append(block)
+            descriptor = []
+            # Concantenate hogs
+            for row in range(block_size):
+                for cell in range(block_size):
+                    for bn in range(6):
+                        descriptor.append(ori_histo[i+row][j+cell][bn])
+            # Normalize the descriptor
+            squared_sums = 0.0
+            for elem in range(len(descriptor)):
+                squared_sums += descriptor[elem]*descriptor[elem]
+            for elem in range(len(descriptor)):
+                tmp = descriptor[elem]
+                descriptor[elem] = tmp/math.sqrt(squared_sums+const_squared)
+            
+            # Assign normalized histogram to final matrix
+            ori_histo_row.append(descriptor)
         ori_histo_normalized.append(ori_histo_row)
-           
+
     return ori_histo_normalized
 
 
 def extract_hog(im):
     # convert grey-scale image to double format
     im = im.astype('float') / 255.0
-    # To do
 
     # get differential images
-    diff_filter_x, diff_filter_y = get_differential_filter();
+    diff_filter_x, diff_filter_y = get_differential_filter()
 
     diff_x = filter_image(im, diff_filter_x)
     diff_y = filter_image(im, diff_filter_y)
+    visualize(diff_x)
+    visualize(diff_y)
 
     # get gradients 
     grad_mag, grad_angle = get_gradient(diff_x, diff_y)
+    visualize(grad_mag)
+    visualize(grad_angle)
 
-    histogram = build_histogram(grad_mag, grad_angle, 8)
+    block_size = 2
+    cell_size = 8
 
-    descriptor = get_block_descriptor(histogram,2)
+    histogram = build_histogram(grad_mag, grad_angle, cell_size)
+
+    descriptor = get_block_descriptor(histogram,block_size)
 
     # Concantenate all block descriptors to get HOG
-    num_vals = len(descriptor)*len(descriptor[0])*24
+    #num_vals = len(descriptor)*len(descriptor[0])*6*(block_size**2)
     hog = []
     for row in descriptor:
         for block_desc in row:
             hog = np.append(hog, block_desc)
 
-    visualize_hog(im, hog, 8, 2)
 
+    print(hog.shape)
 
-
-    #visualize(grad_angle)
-
-    # visualize to verify
-    #visualize_hog(im, hog, 8, 2)
-    #visualize_hog(im, im, 8, 2)
-
-    #return hog
+    visualize_hog_block(im, hog, cell_size, block_size)
+    
     return im
 
 def visualize(im):
     plt.imshow(im, cmap='gray', vmin=0, vmax=1)
     plt.show()
+
+# Zhixuan Yu's code
+# visualize histogram of each cell
+def visualize_hog_cell(im, ori_histo, cell_size):
+    norm_constant = 1e-3
+    num_cell_h, num_cell_w, num_bins = ori_histo.shape
+    max_len = cell_size / 3
+    angles = np.arange(0, np.pi, np.pi/num_bins)
+    mesh_x, mesh_y = np.meshgrid(np.r_[cell_size/2: cell_size*num_cell_w: cell_size], np.r_[cell_size/2: cell_size*num_cell_h: cell_size])
+    bin_ave = np.sqrt(np.sum(ori_histo ** 2, axis=2) + norm_constant ** 2) # (ori_histo.shape[0], ori_histo.shape[1])
+    histo_normalized = ori_histo / np.expand_dims(bin_ave, axis=2) * max_len # same dims as ori_histo
+    mesh_u = histo_normalized * np.sin(angles).reshape((1, 1, num_bins)) # expand to same dims as histo_normalized
+    mesh_v = histo_normalized * -np.cos(angles).reshape((1, 1, num_bins)) # expand to same dims as histo_normalized
+    plt.imshow(im, cmap='gray', vmin=0, vmax=1)
+    for i in range(num_bins):
+        plt.quiver(mesh_x - mesh_u[:, :, i], mesh_y - mesh_v[:, :, i], 2 * mesh_u[:, :, i], 2 * mesh_v[:, :, i],
+        color='white', headaxislength=0, headlength=0, scale_units='xy', scale=1, width=0.002, angles='xy')
+    plt.show()
+
+# Zhixuan Yu's code
+# visualize histogram of each block
+def visualize_hog_block(im, hog, cell_size, block_size):
+    num_bins = 6
+    max_len = 7 # control sum of segment lengths for visualized histogram bin of each block
+    im_h, im_w = im.shape
+    num_cell_h, num_cell_w = int(im_h / cell_size), int(im_w / cell_size)
+    num_blocks_h, num_blocks_w = num_cell_h - block_size + 1, num_cell_w - block_size + 1
+    histo_normalized = hog.reshape((num_blocks_h, num_blocks_w, block_size**2, num_bins))
+    histo_normalized_vis = np.sum(histo_normalized**2, axis=2) * max_len # num_blocks_h x num_blocks_w x num_bins
+    angles = np.arange(0, np.pi, np.pi/num_bins)
+    mesh_x, mesh_y = np.meshgrid(np.r_[int(cell_size*block_size/2): cell_size*num_cell_w-(cell_size*block_size/2)+1: cell_size], np.r_[int(cell_size*block_size/2): cell_size*num_cell_h-(cell_size*block_size/2)+1: cell_size])
+    mesh_u = histo_normalized_vis * np.sin(angles).reshape((1, 1, num_bins)) # expand to same dims as histo_normalized
+    mesh_v = histo_normalized_vis * -np.cos(angles).reshape((1, 1, num_bins)) # expand to same dims as histo_normalized
+    plt.imshow(im, cmap='gray', vmin=0, vmax=1)
+    for i in range(num_bins):
+        plt.quiver(mesh_x - 0.5 * mesh_u[:, :, i], mesh_y - 0.5 * mesh_v[:, :, i], mesh_u[:, :, i], mesh_v[:, :, i],
+        color='red', headaxislength=0, headlength=0, scale_units='xy', scale=1, width=0.002, angles='xy')
+    plt.show() 
 
 # visualize histogram of each block
 def visualize_hog(im, hog, cell_size, block_size):
@@ -231,12 +268,12 @@ def visualize_hog(im, hog, cell_size, block_size):
     plt.imshow(im, cmap='gray', vmin=0, vmax=1)
     for i in range(num_bins):
         plt.quiver(mesh_x - 0.5 * mesh_u[:, :, i], mesh_y - 0.5 * mesh_v[:, :, i], mesh_u[:, :, i], mesh_v[:, :, i],
-                   color='white', headaxislength=0, headlength=0, scale_units='xy', scale=1, width=0.002, angles='xy')
+                   color='red', headaxislength=0, headlength=0, scale_units='xy', scale=1, width=0.002, angles='xy')
     plt.show()
 
 
 if __name__=='__main__':
-    im = cv2.imread('dog.jpeg', 0)
+    im = cv2.imread('flower.jpg', 0)
     hog = extract_hog(im)
 
 
