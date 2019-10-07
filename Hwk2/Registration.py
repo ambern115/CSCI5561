@@ -8,6 +8,59 @@ from scipy import interpolate
 
 def find_match(img1, img2):
     # To do
+    
+    # Use cv2 to get descriptors
+    sift_img1 = cv2.xfeatures2d.SIFT_create()
+    kp_img1, des_img1 = sift_img1.detectAndCompute(img1,None)
+
+    sift_img2 = cv2.xfeatures2d.SIFT_create()
+    kp_img2, des_img2 = sift_img2.detectAndCompute(img2,None)
+
+    
+    # Code used to visualize the keypoints
+    #cv2.imwrite('sift_keypoints.jpg', cv2.drawKeypoints(img1,kp_img1,img1,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+    #cv2.imwrite('sift_keypoints2.jpg', cv2.drawKeypoints(img2,kp_img2,img2,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+
+    # Find 2 nearest neighbors of each keypoint based on Euclidean distance between descriptor vectors
+    nbrs_img1 = NearestNeighbors(n_neighbors=2).fit(des_img2)
+    distances_img1, indices_img1 = nbrs_img1.kneighbors(des_img1)
+
+    nbrs_img2 = NearestNeighbors(n_neighbors=2).fit(des_img1)
+    distances_img2, indices_img2 = nbrs_img2.kneighbors(des_img2)
+
+    x1 = np.empty((0,2))
+    x2 = np.empty((0,2))
+
+    # Match from left to right
+    for i in range(len(distances_img1)):
+        ratio = distances_img1[i][0]/distances_img1[i][1]
+        if (ratio <= 0.7):
+            pt1 = []
+            pt2 = []
+
+            pt1 = np.append(pt1, kp_img1[i].pt[0])
+            pt1 = np.append(pt1, kp_img1[i].pt[1])
+            pt2 = np.append(pt2, kp_img2[indices_img1[i][0]].pt[0])
+            pt2 = np.append(pt2, kp_img2[indices_img1[i][0]].pt[1])
+
+            x1 = np.append(x1, [pt1], axis=0)
+            x2 = np.append(x2, [pt2], axis=0)
+
+    # Match from right to left
+    for i in range(len(distances_img2)):
+        ratio = distances_img2[i][0]/distances_img2[i][1]
+        if (ratio <= 0.7):
+            pt1 = []
+            pt2 = []
+
+            pt2 = np.append(pt2, kp_img2[i].pt[0])
+            pt2 = np.append(pt2, kp_img2[i].pt[1])
+            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[0])
+            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[1])
+
+            x1 = np.append(x1, [pt1], axis=0)
+            x2 = np.append(x2, [pt2], axis=0)   
+
     return x1, x2
 
 def align_image_using_feature(x1, x2, ransac_thr, ransac_iter):
@@ -40,7 +93,9 @@ def visualize_find_match(img1, img2, x1, x2, img_h=500):
     x2[:, 0] += img1_resized.shape[1]
     img = np.hstack((img1_resized, img2_resized))
     plt.imshow(img, cmap='gray', vmin=0, vmax=255)
+    
     for i in range(x1.shape[0]):
+        print("plot made" + str(i) + " " + str(x1.shape[0]))
         plt.plot([x1[i, 0], x2[i, 0]], [x1[i, 1], x2[i, 1]], 'b')
         plt.plot([x1[i, 0], x2[i, 0]], [x1[i, 1], x2[i, 1]], 'bo')
     plt.axis('off')
@@ -133,20 +188,26 @@ if __name__ == '__main__':
         target = cv2.imread('./Hyun_Soo_target{}.jpg'.format(i+1), 0)  # read as grey scale image
         target_list.append(target)
 
-    x1, x2 = find_match(template, target_list[0])
-    visualize_find_match(template, target_list[0], x1, x2)
+    #template = cv2.imread('./einstein.jpg', 0)
+    template = cv2.imread('./dalton1.jpg', 0)
+    dalton = cv2.imread('./dalton2.jpg', 0)
+    
 
-    A = align_image_using_feature(x1, x2, ransac_thr, ransac_iter)
+    x1, x2 = find_match(template, dalton)
+    visualize_find_match(template, dalton, x1, x2)
 
-    img_warped = warp_image(target_list[0], A, template.shape)
-    plt.imshow(img_warped, cmap='gray', vmin=0, vmax=255)
-    plt.axis('off')
-    plt.show()
 
-    A_refined, errors = align_image(template, target_list[0], A)
-    visualize_align_image(template, target_list[0], A, A_refined, errors)
+    # A = align_image_using_feature(x1, x2, ransac_thr, ransac_iter)
 
-    A_list = track_multi_frames(template, target_list)
-    visualize_track_multi_frames(template, target_list, A_list)
+    # img_warped = warp_image(target_list[0], A, template.shape)
+    # plt.imshow(img_warped, cmap='gray', vmin=0, vmax=255)
+    # plt.axis('off')
+    # plt.show()
+
+    # A_refined, errors = align_image(template, target_list[0], A)
+    # visualize_align_image(template, target_list[0], A, A_refined, errors)
+
+    # A_list = track_multi_frames(template, target_list)
+    # visualize_track_multi_frames(template, target_list, A_list)
 
 
