@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
+import random
+
 from sklearn.neighbors import NearestNeighbors
 from scipy import interpolate
 
@@ -63,9 +65,60 @@ def find_match(img1, img2):
 
     return x1, x2
 
-def align_image_using_feature(x1, x2, ransac_thr, ransac_iter):
-    # To do
-    return A
+# Returns the homography matrix between given point correspondences
+def get_homography(x1, x2):
+    A = np.empty((0,8))
+    x = np.empty((0,1))
+    b = np.empty((0,1))
+    
+    for i in range(len(x2)):
+        tmp_a = np.empty((0,8))
+        pt1 = x1[i]
+        pt2 = x2[i]
+        tmp_a = np.append(tmp_a, [pt1[0], pt1[1]])
+        tmp_a = np.append(tmp_a, [1, 0, 0, 0])
+        tmp_a = np.append(tmp_a, [-1*pt1[0]*pt2[0]])
+        tmp_a = np.append(tmp_a, [-1*pt1[1]*pt2[0]])
+        A = np.append(A, [tmp_a], axis=0)
+
+        tmp_a = np.empty((0,8))
+        tmp_a = np.append(tmp_a, [0, 0, 0])
+        tmp_a = np.append(tmp_a, [pt1[0], pt1[1], 1])
+        tmp_a = np.append(tmp_a, [-1*pt1[0]*pt2[1]])
+        tmp_a = np.append(tmp_a, [-1*pt1[1]*pt2[1]])
+        A = np.append(A, [tmp_a], axis=0)
+
+        b = np.append(b, [[pt2[0]]], axis=0)
+        b = np.append(b, [[pt2[1]]], axis=0)
+
+    tmp = np.linalg.inv(np.matmul(np.matrix.transpose(A),A))
+    x = np.matmul(tmp, (np.matmul(np.matrix.transpose(A),b)))
+        
+    return x
+
+
+def align_image_using_feature(x1, x2, ransac_thr, ransac_iter, tmp, tar):
+    # ransac_th: error threshold
+    # ransac_iter: number of iterations it runs
+
+    # Random Sampling of 4 correspondences between x1 and x2
+    
+    rand_nums = random.sample(range(0, len(x1)), 4)
+
+    tmp_x1 = np.empty((0,2))
+    tmp_x2 = np.empty((0,2))
+    for n in rand_nums:
+        tmp_x1 = np.append(tmp_x1, [x1[n]], axis=0)
+        tmp_x2 = np.append(tmp_x2, [x2[n]], axis=0)
+
+    visualize_find_match(tmp, tar, tmp_x1, tmp_x2)
+
+    # Draw model around selected correspondences
+    hom = get_homography(tmp_x1, tmp_x2)
+
+    # Thresholding...
+    
+
 
 def warp_image(img, A, output_size):
     # To do
@@ -95,7 +148,6 @@ def visualize_find_match(img1, img2, x1, x2, img_h=500):
     plt.imshow(img, cmap='gray', vmin=0, vmax=255)
     
     for i in range(x1.shape[0]):
-        print("plot made" + str(i) + " " + str(x1.shape[0]))
         plt.plot([x1[i, 0], x2[i, 0]], [x1[i, 1], x2[i, 1]], 'b')
         plt.plot([x1[i, 0], x2[i, 0]], [x1[i, 1], x2[i, 1]], 'bo')
     plt.axis('off')
@@ -189,15 +241,15 @@ if __name__ == '__main__':
         target_list.append(target)
 
     #template = cv2.imread('./einstein.jpg', 0)
-    template = cv2.imread('./dalton1.jpg', 0)
-    dalton = cv2.imread('./dalton2.jpg', 0)
+    ##template = cv2.imread('./dalton1.jpg', 0)
+    #dalton = cv2.imread('./dalton2.jpg', 0)
     
 
-    x1, x2 = find_match(template, dalton)
-    visualize_find_match(template, dalton, x1, x2)
+    x1, x2 = find_match(template, target_list[0])
+    visualize_find_match(template, target_list[0], x1, x2)
 
 
-    # A = align_image_using_feature(x1, x2, ransac_thr, ransac_iter)
+    A = align_image_using_feature(x1, x2, 0.5, 2, template, target_list[0])
 
     # img_warped = warp_image(target_list[0], A, template.shape)
     # plt.imshow(img_warped, cmap='gray', vmin=0, vmax=255)
