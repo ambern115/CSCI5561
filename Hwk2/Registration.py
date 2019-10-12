@@ -50,19 +50,19 @@ def find_match(img1, img2):
             x2 = np.append(x2, [pt2], axis=0)
 
     # Match from right to left
-    for i in range(len(distances_img2)):
-        ratio = distances_img2[i][0]/distances_img2[i][1]
-        if (ratio <= 0.7):
-            pt1 = []
-            pt2 = []
+    # for i in range(len(distances_img2)):
+    #     ratio = distances_img2[i][0]/distances_img2[i][1]
+    #     if (ratio <= 0.7):
+    #         pt1 = []
+    #         pt2 = []
 
-            pt2 = np.append(pt2, kp_img2[i].pt[0])
-            pt2 = np.append(pt2, kp_img2[i].pt[1])
-            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[0])
-            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[1])
+    #         pt2 = np.append(pt2, kp_img2[i].pt[0])
+    #         pt2 = np.append(pt2, kp_img2[i].pt[1])
+    #         pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[0])
+    #         pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[1])
 
-            x1 = np.append(x1, [pt1], axis=0)
-            x2 = np.append(x2, [pt2], axis=0)   
+    #         x1 = np.append(x1, [pt1], axis=0)
+    #         x2 = np.append(x2, [pt2], axis=0)   
 
     return x1, x2
 
@@ -93,9 +93,10 @@ def get_homography(x1, x2):
         b = np.append(b, [[pt2[0]]], axis=0)
         b = np.append(b, [[pt2[1]]], axis=0)
 
-    #x = np.linalg.lstsq(A,b)
+    
 
     try:
+        #x = np.linalg.lstsq(A,b)
         tmp = np.linalg.inv(np.matmul(np.matrix.transpose(A),A))
         x = np.matmul(tmp, (np.matmul(np.matrix.transpose(A),b)))
 
@@ -103,7 +104,7 @@ def get_homography(x1, x2):
         h = np.empty((0,3))
         h = np.append(h, [[x[0][0], x[1][0], x[2][0]]], axis=0)
         h = np.append(h, [[x[3][0], x[4][0], x[5][0]]], axis=0)
-        h = np.append(h, [[x[6][0], x[7][0], 1]], axis=0)
+        h = np.append(h, [[x[6][0], x[7][0], 1.0]], axis=0)
 
         return h
     except:
@@ -138,7 +139,10 @@ def visualize_homography(img1, img2, hom, x1, x2, ox1, ox2):
     scale_factor2 = img_h/img2.shape[0]
     img1_resized = cv2.resize(img1, None, fx=scale_factor1, fy=scale_factor1)
     img2_resized = cv2.resize(img2, None, fx=scale_factor2, fy=scale_factor2)
-    trans = trans * scale_factor1
+    
+    # Buffer to translate border onto target image
+    b_x = img1_resized.shape[1]
+    trans = trans * scale_factor2
     
     x1 = x1 * scale_factor1
     x2 = x2 * scale_factor2
@@ -148,6 +152,7 @@ def visualize_homography(img1, img2, hom, x1, x2, ox1, ox2):
     ox2 = ox2 * scale_factor2
     ox2[:, 0] += img1_resized.shape[1]
     
+    img = img2_resized
     img = np.hstack((img1_resized, img2_resized))
     plt.imshow(img, cmap='gray', vmin=0, vmax=255)
     
@@ -155,17 +160,16 @@ def visualize_homography(img1, img2, hom, x1, x2, ox1, ox2):
         plt.plot([ox1[i, 0], ox2[i, 0]], [ox1[i, 1], ox2[i, 1]], 'y')
         plt.plot([ox1[i, 0], ox2[i, 0]], [ox1[i, 1], ox2[i, 1]], 'yo')
 
-
     for i in range(trans.shape[0]):
-        plt.plot([trans[0][0], trans[1][0]], [trans[0][1], trans[1][1]], 'r')
-        plt.plot([trans[1][0], trans[3][0]], [trans[1][1], trans[3][1]], 'r')
-        plt.plot([trans[3][0], trans[2][0]], [trans[3][1], trans[2][1]], 'r')
-        plt.plot([trans[2][0], trans[0][0]], [trans[2][1], trans[0][1]], 'r')
+        plt.plot([trans[0][0]+b_x, trans[1][0]+b_x], [trans[0][1], trans[1][1]], 'r')
+        plt.plot([trans[1][0]+b_x, trans[3][0]+b_x], [trans[1][1], trans[3][1]], 'r')
+        plt.plot([trans[3][0]+b_x, trans[2][0]+b_x], [trans[3][1], trans[2][1]], 'r')
+        plt.plot([trans[2][0]+b_x, trans[0][0]+b_x], [trans[2][1], trans[0][1]], 'r')
         
-        #plt.plot([trans[0][0], trans[1][0]], [trans[0][1], trans[1][1]], 'bo')
-        #plt.plot([trans[1][0], trans[2][0]], [trans[1][1], trans[2][1]], 'bo')
-        #plt.plot([trans[2][0], trans[3][0]], [trans[2][1], trans[3][1]], 'bo')
-        #plt.plot([trans[3][0], trans[0][0]], [trans[3][1], trans[0][1]], 'bo')
+        # plt.plot([trans[0][0], trans[1][0]], [trans[0][1], trans[1][1]], 'bo')
+        # plt.plot([trans[1][0], trans[2][0]], [trans[1][1], trans[2][1]], 'bo')
+        # plt.plot([trans[2][0], trans[3][0]], [trans[2][1], trans[3][1]], 'bo')
+        # plt.plot([trans[3][0], trans[0][0]], [trans[3][1], trans[0][1]], 'bo')
         #plt.plot([x1[i, 0], x2[i, 0]], [x1[i, 1], x2[i, 1]], 'bo')
 
     for i in range(x1.shape[0]):
@@ -313,7 +317,90 @@ def align_image_using_feature(x1, x2, ransac_thr, ransac_iter, tmp, tar):
 
 def warp_image(img, A, output_size):
     # To do
-    return img_warped
+    h = output_size[0]
+    w = output_size[1]
+
+    tmp_h = 2000
+    tmp_w = 2000
+   
+
+    forward = np.empty((h, w))
+    tmp_forward = np.empty((tmp_h, tmp_w))
+
+    # Get four corners of the transformed image...?
+    corner = []
+
+    for j in range(len(img[0])):
+
+        for i in range(len(img)):
+            pt_b = np.matmul(A, [[i],[j], [1.0]])
+            # print(pt_b)
+           
+            lmbda = 1.0/pt_b[2]
+            new_x = (int)(pt_b[0]*lmbda)
+            new_y = (int)(pt_b[1]*lmbda)
+
+            if (j==0 and i==0):
+                corner = [new_x, new_y]
+
+            if ((new_x >= tmp_w or new_y >= tmp_h or new_x < 0 or new_y < 0)==False):
+                tmp_forward[new_x][new_y] = img[i][j]
+    print(img.shape[0])
+
+    trans = np.empty((0,2))
+    corners = [[0,0], [w-1, 0], [0, h-1], [w-1, h-1]]
+
+    for i in range(4):
+    # Only map 4 corners of image
+        tmp = np.empty((0,1))
+        tmp = np.append(tmp, [[corners[i][0]]], axis=0)
+        tmp = np.append(tmp, [[corners[i][1]]], axis=0)
+        tmp = np.append(tmp, [[1]], axis=0)
+
+        tmp = np.matmul(A, tmp)
+        lmbda = 1.0/tmp[2][0]
+
+        trans = np.append(trans, [[lmbda*tmp[0][0], lmbda*tmp[1][0]]], axis=0)
+
+    plt.imshow(tmp_forward, cmap='gray', vmin=0, vmax=255)
+
+    for i in range(trans.shape[0]):
+        plt.plot([trans[0][0], trans[1][0]], [trans[0][1], trans[1][1]], 'r')
+        plt.plot([trans[1][0], trans[3][0]], [trans[1][1], trans[3][1]], 'r')
+        plt.plot([trans[3][0], trans[2][0]], [trans[3][1], trans[2][1]], 'r')
+        plt.plot([trans[2][0], trans[0][0]], [trans[2][1], trans[0][1]], 'r')
+
+    plt.show()
+
+    forward_np = np.empty((0,w))
+    for i in range(h):
+        row = []
+        for j in range(w):
+            val = forward[i][j]
+            if (np.isnan(val)):
+                row.append(255)
+            else:
+                row.append((val))
+        forward_np = np.append(forward_np, [row], axis=0)
+    print(forward_np.shape[0])
+    forward = forward_np
+    # Forward Mapping: for each pixel in old img, find its transformation in new
+    # for i in range(output_size[0]): # width
+    #     row = np.empty((output_size[0]))
+    #     for j in range(output_size[1]): # height
+    #         # Find corresponding point in new image
+    
+    scale_factor2 = h/forward.shape[0]
+    print(scale_factor2)
+    
+    #forward = np.hstack((img_resized))
+
+    plt.imshow(forward, cmap='gray', vmin=0, vmax=255)
+
+    plt.show()
+    
+
+    return forward
 
 
 def align_image(template, target, A):
@@ -439,7 +526,7 @@ if __name__ == '__main__':
     x1, x2 = find_match(template, target_list[0])
     visualize_find_match(template, target_list[0], x1, x2)
 
-    A = align_image_using_feature(x1, x2, 6, 50, template, target_list[1])
+    A = align_image_using_feature(x1, x2, 4, 30, template, target_list[1])
 
     img_warped = warp_image(target_list[0], A, template.shape)
     # plt.imshow(img_warped, cmap='gray', vmin=0, vmax=255)
