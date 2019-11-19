@@ -67,6 +67,11 @@ def fc_backward(dl_dy, x, w, b, y):
 
 def loss_euclidean(y_tilde, y):
     # TO DO
+    l = np.linalg.norm(y - y_tilde)
+
+    # I don't know how to do this?
+    dl_dy = np.matrix.transpose(y_tilde)*-1
+
     return l, dl_dy
 
 def loss_cross_entropy_softmax(x, y):
