@@ -12,6 +12,8 @@ from collections import Counter  # Used in get_mini_batch
 
 def get_mini_batch(im_train, label_train, batch_size):
     # Randomly sample batch_size # samples from images
+    if (batch_size > len(im_train)):
+        batch_size = len(im_train)
     indices = random.sample(range(len(im_train)), batch_size)
 
     # Find number of unique labels in label_train
@@ -39,11 +41,27 @@ def get_mini_batch(im_train, label_train, batch_size):
 
 def fc(x, w, b):
     # TO DO
+    y = np.dot(w,x) + b;
+
     return y
 
 
 def fc_backward(dl_dy, x, w, b, y):
     # TO DO
+
+    dl_dw = np.empty((0,))  # 1 x (m*n)
+
+    # Unsure if this is how x height should be accessed
+    for i in range(len(x)):
+        tmp = np.dot(w[i],x[i]) + b[i]
+        if (tmp > 0):
+            val = np.dot((tmp - y[i]), np.linalg.transpose(x[i]))
+            dl_dw = np.append(dl_dw, [val], axis=0)
+        else:
+            zero = np.zeros((len(x),))
+            dl_dw = np.append(dl_dw, [zero], axis=0)
+    
+
     return dl_dx, dl_dw, dl_db
 
 
@@ -95,6 +113,34 @@ def flattening_backward(dl_dy, x, y):
 
 def train_slp_linear(mini_batch_x, mini_batch_y):
     # TO DO
+    n_iters = 100
+    learn_rate = 1
+    decay_rate = 0.5  # (0,1]
+    # Initialize wights with a Gaussian noise 
+    w = np.random.normal(size=((10,196)))
+    b = np.zeros((10,1))
+    k = 1
+
+    for i in range(n_iters):
+        if (i % 1000 == 0):
+            learn_rate = decay_rate*learn_rate
+        dl_dw = np.zeros((1,10*196))
+        dl_db = np.zeros((1,10))
+
+        for img in range(len(mini_batch_x)):
+            label_pred = fc(mini_batch_x[img], w, b)
+            l, dl_dy = loss_euclidean(label_pred, mini_batch_y[img])
+            dl_dx, tmp_dl_dw, tmp_dl_db = fc_backward(dl_dy, mini_batch_x[img], w, b, mini_batch_y[img])
+            dl_dw = dl_dw + tmp_dl_dw
+            dl_db = dl_db + tmp_dl_db
+        if (k > len(mini_batch_x)):
+            k = 1
+        else:
+            k += 1
+        # Update weights and bias
+        w = w - learn_rate * dl_dw
+        b = b - learn_rate * dl_db
+    
     return w, b
 
 def train_slp(mini_batch_x, mini_batch_y):
