@@ -79,8 +79,44 @@ def loss_euclidean(y_tilde, y):
 
     return l, dl_dy
 
+
 def loss_cross_entropy_softmax(x, y):
-    # TO DO
+    x = x.reshape(10,)
+    max_x = -1*np.amax(x)  # Used to help prevent overflow
+
+    ex_sum = 0.0
+    for i in range(len(x)):
+        ex_sum = ex_sum+math.exp(x[i]+max_x)
+
+    l = 0.0
+    for i in range(len(x)):
+        if (abs(x[i]+max_x) > 100): # Prevent overflow
+            if (x[i] < 0):
+                tmp = math.exp(-100)
+            else:
+                tmp = math.exp(100)
+        else:
+            tmp = math.exp(x[i]+max_x)
+        y_tilde = tmp/ex_sum
+        l = l + y[i] * math.log(y_tilde)
+
+   
+    # Compute dl_dy w respect to x
+    y_tilde = np.zeros((len(x),))  # len y = 10
+    for i in range(len(x)):
+        tmp_n = 0.0
+        if (abs(x[i]) > 100): # Prevent overflow
+            if (x[i] < 0):
+                tmp_n = math.exp(-100)
+            else:
+                tmp_n = math.exp(100)
+        else:
+            tmp_n = math.exp(x[i]+max_x)
+        tmp = tmp_n/ex_sum
+        y_tilde[i] = tmp
+    
+    dl_dy = y_tilde-y
+    
     return l, dl_dy
 
 def relu(x):
@@ -157,8 +193,40 @@ def train_slp_linear(mini_batch_x, mini_batch_y):
     return w, b
 
 def train_slp(mini_batch_x, mini_batch_y):
-    # TO DO
+    n_iters = 500
+    learn_rate = 0.05
+    decay_rate = 0.5  # (0,1]
+
+    # Initialize wights with a Gaussian noise with values b/w 0 and 1
+    w = scistats.truncnorm(0.0, 1.0, loc=0.0, scale=1.0).rvs((10,196))
+    b = np.zeros((10,))
+    k = 0
+
+    for i in range(n_iters):
+        if (i % 1000 == 0):
+            learn_rate = decay_rate*learn_rate
+        dl_dw = np.zeros((10,196))
+        dl_db = np.zeros((1,10))
+
+        for img in range(len(mini_batch_x[0])):
+            label_pred = fc(mini_batch_x[k][img], w, b)
+            l, dl_dy = loss_cross_entropy_softmax(label_pred, mini_batch_y[k][img])
+            dl_dx, tmp_dl_dw, tmp_dl_db = fc_backward(dl_dy, mini_batch_x[k][img], w, b, mini_batch_y[k][img])
+            dl_dw = dl_dw + tmp_dl_dw
+            dl_db = dl_db + tmp_dl_db
+
+        if (k >= len(mini_batch_x)-1):
+            k = 0
+        else:
+            k += 1
+        # Update weights and bias
+        w = w - learn_rate * dl_dw
+        b = b - learn_rate * dl_db
+    plt.imshow(w)
+    plt.show()
+    
     return w, b
+
 
 def train_mlp(mini_batch_x, mini_batch_y):
     # TO DO
@@ -171,8 +239,8 @@ def train_cnn(mini_batch_x, mini_batch_y):
 
 
 if __name__ == '__main__':
-    main.main_slp_linear()
-    #main.main_slp()
+    #main.main_slp_linear()
+    main.main_slp()
     #main.main_mlp()
     #main.main_cnn()
 
