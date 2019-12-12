@@ -9,11 +9,107 @@ from mpl_toolkits.mplot3d import Axes3D
 
 def find_match(img1, img2):
     # TO DO
+    
+    # Use cv2 to get descriptors
+    sift_img1 = cv2.xfeatures2d.SIFT_create()
+    kp_img1, des_img1 = sift_img1.detectAndCompute(img1,None)
+
+    sift_img2 = cv2.xfeatures2d.SIFT_create()
+    kp_img2, des_img2 = sift_img2.detectAndCompute(img2,None)
+      
+    # # Code used to visualize the keypoints
+    # cv2.imwrite('sift_keypoints.jpg', cv2.drawKeypoints(img1,kp_img1,img1,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+    # cv2.imwrite('sift_keypoints2.jpg', cv2.drawKeypoints(img2,kp_img2,img2,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+
+    # Find 2 nearest neighbors of each keypoint based on Euclidean distance between descriptor vectors
+    nbrs_img1 = NearestNeighbors(n_neighbors=2).fit(des_img2)
+    distances_img1, indices_img1 = nbrs_img1.kneighbors(des_img1)
+
+    nbrs_img2 = NearestNeighbors(n_neighbors=2).fit(des_img1)
+    distances_img2, indices_img2 = nbrs_img2.kneighbors(des_img2)
+
+    x1_l = np.empty((0,2)) # left to right
+    x2_l = np.empty((0,2)) # left to right
+    x1_r = np.empty((0,2)) # right to left
+    x2_r = np.empty((0,2)) # right to left
+
+    # Match from left to right
+    for i in range(len(distances_img1)):
+        # Filter by ratio test
+        ratio = distances_img1[i][0]/distances_img1[i][1]
+        if (ratio < 0.7):
+            # If points unique enough, add them
+            pt1 = []
+            pt2 = []
+
+            pt1 = np.append(pt1, kp_img1[i].pt[0])
+            pt1 = np.append(pt1, kp_img1[i].pt[1])
+            pt2 = np.append(pt2, kp_img2[indices_img1[i][0]].pt[0])
+            pt2 = np.append(pt2, kp_img2[indices_img1[i][0]].pt[1])
+
+            x1_l = np.append(x1_l, [pt1], axis=0)
+            x2_l = np.append(x2_l, [pt2], axis=0)
+
+    # Match from right to left
+    for i in range(len(distances_img2)):
+        # Filter by ratio test
+        ratio = distances_img2[i][0]/distances_img2[i][1]
+        if (ratio < 0.7):
+            pt1 = []
+            pt2 = []
+
+            pt2 = np.append(pt2, kp_img2[i].pt[0])
+            pt2 = np.append(pt2, kp_img2[i].pt[1])
+            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[0])
+            pt1 = np.append(pt1, kp_img1[indices_img2[i][0]].pt[1])
+
+            x1_r = np.append(x1_r, [pt1], axis=0)
+            x2_r = np.append(x2_r, [pt2], axis=0)
+
+    pts1 = np.empty((0,2))
+    pts2 = np.empty((0,2))
+
+    # Bi directinoal consistency check
+    # Filter out points that don't match in both directions
+    for i in range(len(x1_l)):
+      point1 = x1_l[i]
+      for j in range(len(x1_r)):
+        point2 = x1_r[j]
+        if (point1[0] == point2[0] and point1[1] == point2[1]):
+          # Check that corresponding points in x2 match
+          if (x2_l[i][0] == x2_r[j][0] and x2_l[i][1] == x2_r[j][1]):
+            pts1 = np.append(pts1, [x1_l[i]], axis=0)
+            pts2 = np.append(pts2, [x2_l[i]], axis=0)
+
+
     return pts1, pts2
 
 
 def compute_F(pts1, pts2):
     # TO DO
+
+    b = np.zeros((len(pts1),9))
+    
+    # Construct matrix A
+    A = np.zeros((len(pts1), 9))
+
+    for i in range(len(pts1)):
+      A[i][0] = pts1[i][0]*pts2[i][0]
+      A[i][1] = pts1[i][1]*pts2[i][0]
+      A[i][2] = pts2[i][0]
+      A[i][3] = pts1[i][1]*pts2[i][0]
+      A[i][4] = pts1[i][1]*pts2[i][1]
+      A[i][5] = pts2[i][1]
+      A[i][6] = pts1[i][0]
+      A[i][7] = pts1[i][1]
+      A[i][8] = 1.0
+
+    # Compute F
+    F = np.zeros((9,9)) 
+    
+    
+
+
     return F
 
 
