@@ -9,6 +9,8 @@ from keras.applications import vgg19
 from keras import backend as K
 
 import matplotlib.pyplot as plt
+import scipy.stats as scistats  # Only used for initialize weight with normal distribution
+
 
 parser = argparse.ArgumentParser(description='Neural style transfer with Keras.')
 # parser.add_argument('base_image_path', metavar='base', type=str,
@@ -30,9 +32,9 @@ args = parser.parse_args()
 # base_image_path = args.base_image_path
 # style_reference_image_path = args.style_reference_image_path
 # result_prefix = args.result_prefix
-base_image_path = "TestImages/small_tree.jpg"
-style_reference_image_path = "TestImages/small_starrynight.jpg"
-result_prefix = "tree_small_1x3"
+base_image_path = "TestImages/medtree.png"
+style_reference_image_path = "TestImages/starrynight.jpg"
+result_prefix = "deeper_conv"
 iterations = 4#args.iter
 
 # these are the weights of the different loss components
@@ -50,6 +52,14 @@ img_ncols = int(width * img_nrows / height)
 
 def preprocess_image(image_path):
     img = load_img(image_path, target_size=(img_nrows, img_ncols))
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = vgg19.preprocess_input(img)
+    return img
+
+
+def preprocess_noise_image():
+    img = load_img("TestImages/tree_noise.jpg", target_size=(img_nrows, img_ncols))
     img = img_to_array(img)
     img = np.expand_dims(img, axis=0)
     img = vgg19.preprocess_input(img)
@@ -157,13 +167,13 @@ def total_variation_loss(x):
 
 # combine these loss functions into a single scalar
 loss = K.variable(0.0)
-layer_features = outputs_dict['block1_conv2']
+layer_features = outputs_dict['block5_conv4']
 base_image_features = layer_features[0, :, :, :]
 combination_features = layer_features[2, :, :, :]
 loss = loss + content_weight * content_loss(base_image_features,
                                             combination_features)
 
-feature_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1']
+feature_layers = ['block1_conv2', 'block2_conv2', 'block3_conv2', 'block4_conv2', 'block5_conv2']
 for layer_name in feature_layers:
     layer_features = outputs_dict[layer_name]
     style_reference_features = layer_features[1, :, :, :]
@@ -225,12 +235,19 @@ class Evaluator(object):
         self.grad_values = None
         return grad_values
 
+def getWhiteNoiseImg(img_shape):
+  out = scistats.truncnorm(0.0, 1.0, loc=0.0, scale=1.0).rvs(img_shape)
+  out = out*255.0
+
+  return out
 
 evaluator = Evaluator()
 
 # run scipy-based optimization (L-BFGS) over the pixels of the generated image
 # so as to minimize the neural style loss
 x = preprocess_image(base_image_path)
+# Make x start as white noise image....
+#x = preprocess_noise_image()
 
 for i in range(iterations):
     print('Start of iteration', i)
