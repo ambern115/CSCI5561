@@ -2,14 +2,14 @@ import cv2
 import numpy as np
 import scipy.io as sio
 from scipy.linalg import null_space
+from scipy.linalg import svd
 import matplotlib.pyplot as plt
 import sys
 from sklearn.neighbors import NearestNeighbors
 from mpl_toolkits.mplot3d import Axes3D
+import random # Used in RANSAC
 
 def find_match(img1, img2):
-    # TO DO
-    
     # Use cv2 to get descriptors
     sift_img1 = cv2.xfeatures2d.SIFT_create()
     kp_img1, des_img1 = sift_img1.detectAndCompute(img1,None)
@@ -32,7 +32,6 @@ def find_match(img1, img2):
     x2_l = np.empty((0,2)) # left to right
     x1_r = np.empty((0,2)) # right to left
     x2_r = np.empty((0,2)) # right to left
-
     # Match from left to right
     for i in range(len(distances_img1)):
         # Filter by ratio test
@@ -69,7 +68,7 @@ def find_match(img1, img2):
     pts1 = np.empty((0,2))
     pts2 = np.empty((0,2))
 
-    # Bi directinoal consistency check
+    # Bi directional consistency check
     # Filter out points that don't match in both directions
     for i in range(len(x1_l)):
       point1 = x1_l[i]
@@ -85,32 +84,154 @@ def find_match(img1, img2):
     return pts1, pts2
 
 
+def get_homography(x1, x2):
+  A = np.empty((0,9))
+  x = np.empty((0,1))
+  b = np.zeros((8,1))
+  
+  # Solve least squares between the given matrices
+  for i in range(len(x2)):
+    tmp_a = np.empty((0,9))
+    pt1 = x1[i]
+    pt2 = x2[i]
+    tmp_a = np.append(tmp_a, [pt1[0]*pt2[0], pt1[1]*pt2[0], pt2[0], pt1[0]*pt2[1], pt1[1]*pt2[1], pt2[1], pt1[0], pt1[1], 1.0])
+    A = np.append(A, [tmp_a], axis=0)
+
+  try:
+    ns = null_space(A)
+
+    # Make x 3x3
+    h = np.empty((0,3))
+    h = np.append(h, [[ns[0][0], ns[1][0], ns[2][0]]], axis=0)
+    h = np.append(h, [[ns[3][0], ns[4][0], ns[5][0]]], axis=0)
+    h = np.append(h, [[ns[6][0], ns[7][0], ns[8][0]]], axis=0)
+
+    return h
+  except:
+    print("Error computing homography")
+    return []
+
+
 def compute_F(pts1, pts2):
-    # TO DO
+  # TO DO
+  ransac_itr = 150
+  ransac_thr = 0.05
 
-    b = np.zeros((len(pts1),9))
-    
-    # Construct matrix A
-    A = np.zeros((len(pts1), 9))
+  # Use RANSAC 8 point algorithm to estimate F matrix from points
+ 
+  # Random Sampling of 8 correspondences between pts1 and pts2
+  # Find inliers with a certain threshold
 
-    for i in range(len(pts1)):
-      A[i][0] = pts1[i][0]*pts2[i][0]
-      A[i][1] = pts1[i][1]*pts2[i][0]
-      A[i][2] = pts2[i][0]
-      A[i][3] = pts1[i][1]*pts2[i][0]
-      A[i][4] = pts1[i][1]*pts2[i][1]
-      A[i][5] = pts2[i][1]
-      A[i][6] = pts1[i][0]
-      A[i][7] = pts1[i][1]
-      A[i][8] = 1.0
+  total_points = len(pts1)
 
-    # Compute F
-    F = np.zeros((9,9)) 
-    
-    
+  zero_m = np.zeros((3,3))
+
+  # list of indices of 8 points sampled and the number of inliers they achieved
+  samples = []
+  
+  for iteration in range(ransac_itr):
+    # Sample 8 correspondences
+    inliers = 0
+    rand_nums = random.sample(range(0, total_points), 8)
+
+    # Add sampled numbers to a numpy matrix
+    tmp_pts1 = np.empty((0,2))
+    tmp_pts2 = np.empty((0,2))
+    for n in rand_nums:
+      tmp_pts1 = np.append(tmp_pts1, [pts1[n]], axis=0)
+      tmp_pts2 = np.append(tmp_pts2, [pts2[n]], axis=0) 
+
+    # these are used just for visualizing the 4 correspondences chosen 
+    ox1 = tmp_pts1
+    ox2 = tmp_pts2
+
+    #visualize_find_match(tmp, tar, tmp_x1, tmp_x2)
+
+    # Get transformation matrix for random samples
+    h = get_homography(tmp_pts1, tmp_pts2) 
+    if(len(h) != 0):
+      # Save indices of this sample
+      samples.append(rand_nums)
+
+      # Count the inliers
+      for i in range(len(pts2)):
+        # Form numpy vector from correspondance
+        pt1 = pts1[i]
+        pt2 = pts2[i]
+
+        tmp_x = np.zeros((0,3))
+
+        tmp_x = np.append(tmp_x, [[pt1[0]*pt2[0], pt1[1]*pt2[0], pt2[0]]], axis=0)
+        tmp_x = np.append(tmp_x, [[pt1[0]*pt2[1], pt1[1]*pt2[1], pt2[1]]], axis=0)
+        tmp_x = np.append(tmp_x, [[pt1[0], pt1[1], 1.0]], axis=0)
+
+        u = np.zeros((3,1))
+        u[0][0] = pt1[0]
+        u[1][0] = pt1[1]
+        u[2][0] = 1.0
+
+        # Multiply vectors and transformation matrix
+        tmp_vec = np.dot(np.array([pt2[0],pt2[1],1.0]), h)
+        tmp_vec = np.dot(tmp_vec, u)
+ 
+        # # Normalize
+        # lmbda = 1.0/tmp_vec[2][0]
+        # x_hat = lmbda*tmp_vec[0][0]
+        # y_hat = lmbda*tmp_vec[1][0]
+
+        # Computed distance of this correspondence from the model 
+        dist_from_model = np.linalg.norm(tmp_vec)
+
+        # Determine if this correspondence is within a threshold of the model
+        #in_x1 = np.empty((0,2))
+        #in_x2 = np.empty((0,2))
+        if ((dist_from_model) <= ransac_thr):
+          inliers = inliers + 1
+      # Add number of inliers to the samples taken  
+      samples[len(samples)-1].append(inliers)
+      samples[len(samples)-1].append(h)
 
 
-    return F
+  # Determine which model fit best based on max number of inliers
+  max_inliers = 0
+  max_idx = -1 # index of the best model in the samples array
+  for i in range(len(samples)):
+    if (samples[i][8] >= max_inliers):
+      max_inliers = samples[i][8]
+      max_idx = i 
+  print(max_inliers)
+  
+  # Retrieve this model again
+  in_x1 = np.empty((0,2)) 
+  in_x2 = np.empty((0,2))
+  tmp_x1 = np.empty((0,2))
+  tmp_x2 = np.empty((0,2))
+  for i in range(8):
+    tmp_x1 = np.append(in_x1, [pts1[samples[max_idx][i]]], axis=0) 
+    tmp_x2 = np.append(in_x2, [pts2[samples[max_idx][i]]], axis=0)
+
+  # Get transformation matrix for model again
+  F = samples[max_idx][9]
+
+  # make rank 2
+  u, s, v = svd(F)
+  new_s = np.zeros((3,3))
+  # get smallest eigenvalue of the diagonal and set to 0
+  if (s[0] < s[1] and s[0] < s[2]):
+    new_s[1][1] = s[1]
+    new_s[2][2] = s[2]
+  elif(s[1] < s[2]):
+    new_s[0][0] = s[0]
+    new_s[2][2] = s[2]
+  else:
+    new_s[0][0] = s[0]
+    new_s[1][1] = s[1]
+  
+  F = np.dot(np.dot(u, new_s), v)
+  
+  print(np.linalg.matrix_rank(F))
+
+  return F
 
 
 def triangulation(P1, P2, pts1, pts2):
