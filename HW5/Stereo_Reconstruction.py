@@ -278,7 +278,6 @@ def nullspace(A, atol=1e-13, rtol=0):
     return ns
 
 def triangulation(P1, P2, pts1, pts2):
-  # TO DO
   pts3D = np.empty((0,3))
 
   # Create skew-symmentric matrices
@@ -311,8 +310,13 @@ def triangulation(P1, P2, pts1, pts2):
 
     try:
       ns = nullspace(A)
-      nsp = np.array([ns[0]/ns[3],ns[1]/ns[3],ns[2]/ns[3]])
-      pts3D = np.append(pts3D, [nsp], axis=0)
+      x = ns[0]/ns[3]
+      y = ns[1]/ns[3]
+      z = ns[2]/ns[3]
+
+      if (x < 80 and y < 80 and z < 80):
+        nsp = np.array([x,y,z])
+        pts3D = np.append(pts3D, [nsp], axis=0)
     except:
       print("null space not found")
 
@@ -322,6 +326,52 @@ def triangulation(P1, P2, pts1, pts2):
 
 def disambiguate_pose(Rs, Cs, pts3Ds):
   # TO DO
+  # last row of R is camera out vector
+
+  # subtract x from c (cam loc)  (x-c)
+  # mult with Rz.T 
+  # if > 0, point is in front of camera
+
+  print("\ndisambiguate_pose")
+
+  best_pos = -1
+  max_pts = 0
+
+  # must satisfy for both cameras to count
+  for i in range(len(Rs)):
+    r_x = Rs[i][2]
+    r_x = np.array([[r_x[0]], [r_x[1]], [r_x[2]]])
+    r_x = r_x.reshape((1,3))
+    c_p = Cs[i]
+    cnt_pts = 0
+    tmp_pts = pts3Ds[i]
+
+    for j in range(len(tmp_pts)):
+      pts = tmp_pts[j]
+      pts = np.array([[pts[0]],[pts[1]],[pts[2]]])
+
+
+      tmp1 = (np.subtract(pts, c_p))
+      tmp = np.dot(r_x, tmp1)
+      if (tmp > 0.0):
+        cnt_pts += 1
+
+    print(i)
+    print(cnt_pts)
+    
+    if (cnt_pts > max_pts):
+      max_pts = cnt_pts
+      best_pos = i
+  
+  print("best idx: ")
+  print(i)
+  print("max: ")
+  print(max_pts)
+
+  R = Rs[i]
+  C = Cs[i]
+  pts3D = pts3Ds[i]
+  
   return R, C, pts3D
 
 
