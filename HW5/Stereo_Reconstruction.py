@@ -325,7 +325,6 @@ def triangulation(P1, P2, pts1, pts2):
 
 
 def disambiguate_pose(Rs, Cs, pts3Ds):
-  # TO DO
   # last row of R is camera out vector
 
   # subtract x from c (cam loc)  (x-c)
@@ -377,11 +376,78 @@ def disambiguate_pose(Rs, Cs, pts3Ds):
 
 def compute_rectification(K, R, C):
   # TO DO
+  # Construct R rect
+  r_x = C / np.linalg.norm(C)
+
+  tmp_z = np.array([[0.0],[0.0],[1.0]])
+  tmp = np.subtract(tmp_z, ((tmp_z * r_x) * r_x))
+  r_z = tmp / np.linalg.norm(tmp)
+
+  r_z = np.array([r_z[0][0], r_z[1][0], r_z[2][0]])
+  r_x = np.array([r_x[0][0], r_x[1][0], r_x[2][0]])
+  r_y = np.cross(r_z, r_x)
+
+
+  R_rect = np.empty((0,3))
+  R_rect = np.append(R_rect, [r_x], axis=0)
+  R_rect = np.append(R_rect, [r_y], axis=0)
+  R_rect = np.append(R_rect, [r_z], axis=0)
+
+  H1 = np.dot(np.dot(K, R_rect.T), np.linalg.inv(K))
+  H2 = np.dot(np.dot(np.dot(K, R_rect.T), R.T), np.linalg.inv(K))
+
   return H1, H2
 
 
 def dense_match(img1, img2):
   # TO DO
+  desc_size = 8
+  h = len(img1)
+  w = len(img1[0])
+  img2_w = len(img2[0])
+  sift = cv2.xfeatures2d.SIFT_create()
+
+  disparity = np.zeros((h,w))
+
+  # Get all descriptors for all points on img2
+  desc_img2 = np.zeros((h,w,128))
+  for i in range(h):
+    for j in range(w):
+      kp = cv2.KeyPoint(i,j,4)
+      _, v_desc = sift.compute(img2,[kp])
+      for k in range(128):
+        desc_img2[i][j][k] = v_desc[0][k]
+    print(str(i))
+
+  for i in range(h):
+    for j in range(w):
+      # retrieve pixel in left image
+      u = img1[i][j]
+      kp = cv2.KeyPoint(i,j,4)
+      _, u_desc = sift.compute(img1,[kp])
+
+      # use SIFT flow to find d
+      min_idx = 0
+      min_d = 100000
+
+      if (u == 0):
+        d = np.square(np.linalg.norm(u_desc))
+      else:
+        for k in range(img2_w):
+          u = img2[i][k]
+          if (u != 0):
+            # kp = cv2.KeyPoint(i,k,1)
+            # _, v_desc = sift.compute(img2,[kp])
+            v_desc = desc_img2[i][k]
+
+            d = np.square(np.linalg.norm(np.subtract(u_desc,v_desc)))
+            if (d < min_d):
+              min_idx = k
+              min_d = d
+      print(str(i) + ", " + str(j))
+      # Add d to final image
+      disparity[i][j] = min_d
+
   return disparity
 
 
