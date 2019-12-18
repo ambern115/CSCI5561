@@ -11,6 +11,8 @@ from keras import backend as K
 import tensorflow as tf
 
 import matplotlib.pyplot as plt
+import scipy.stats as scistats  # Only used for initialize weight with normal distribution
+
 
 from PIL import Image
 
@@ -56,6 +58,14 @@ img_ncols = height#int(width * img_nrows / height)
 
 def preprocess_image(image_path):
     img = load_img(image_path, target_size=(img_nrows, img_ncols))
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = vgg19.preprocess_input(img)
+    return img
+
+
+def preprocess_noise_image():
+    img = load_img("TestImages/tree_noise.jpg", target_size=(img_nrows, img_ncols))
     img = img_to_array(img)
     img = np.expand_dims(img, axis=0)
     img = vgg19.preprocess_input(img)
@@ -163,11 +173,7 @@ def total_variation_loss(x):
 
 # combine these loss functions into a single scalar
 loss = K.variable(0.0)
-layer_features = outputs_dict['block4_conv2']
 base_image_features = layer_features[0, :, :, :]
-combination_features = layer_features[2, :, :, :]
-loss = loss + content_weight * content_loss(base_image_features,
-                                            combination_features)
 
 feature_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1']#, 'block4_conv2', 'block5_conv2']
 for layer_name in feature_layers:
@@ -231,6 +237,11 @@ class Evaluator(object):
         self.grad_values = None
         return grad_values
 
+def getWhiteNoiseImg(img_shape):
+  out = scistats.truncnorm(0.0, 1.0, loc=0.0, scale=1.0).rvs(img_shape)
+  out = out*255.0
+
+  return out
 
 evaluator = Evaluator()
 
