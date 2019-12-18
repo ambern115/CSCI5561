@@ -111,7 +111,7 @@ def get_homography(x1, x2):
 
 def compute_F(pts1, pts2):
   ransac_itr = 150
-  ransac_thr = 0.05
+  ransac_thr = 0.035
 
   # Use RANSAC 8 point algorithm to estimate F matrix from points
  
@@ -375,7 +375,6 @@ def disambiguate_pose(Rs, Cs, pts3Ds):
 
 
 def compute_rectification(K, R, C):
-  # TO DO
   # Construct R rect
   r_x = C / np.linalg.norm(C)
 
@@ -387,66 +386,61 @@ def compute_rectification(K, R, C):
   r_x = np.array([r_x[0][0], r_x[1][0], r_x[2][0]])
   r_y = np.cross(r_z, r_x)
 
-
   R_rect = np.empty((0,3))
+
   R_rect = np.append(R_rect, [r_x], axis=0)
   R_rect = np.append(R_rect, [r_y], axis=0)
   R_rect = np.append(R_rect, [r_z], axis=0)
 
-  H1 = np.dot(np.dot(K, R_rect.T), np.linalg.inv(K))
-  H2 = np.dot(np.dot(np.dot(K, R_rect.T), R.T), np.linalg.inv(K))
+  H1 = np.dot(np.dot(K, R_rect), np.linalg.inv(K))
+  H2 = np.dot(np.dot(np.dot(K, R_rect), R.T), np.linalg.inv(K))
 
   return H1, H2
 
 
 def dense_match(img1, img2):
   # TO DO
-  desc_size = 8
   h = len(img1)
   w = len(img1[0])
-  img2_w = len(img2[0])
   sift = cv2.xfeatures2d.SIFT_create()
 
   disparity = np.zeros((h,w))
 
-  # Get all descriptors for all points on img2
+  # Get all descriptors for all points
+  desc_img1 = np.zeros((h,w,128))
   desc_img2 = np.zeros((h,w,128))
+
+  kps = []
   for i in range(h):
     for j in range(w):
-      kp = cv2.KeyPoint(i,j,4)
-      _, v_desc = sift.compute(img2,[kp])
-      for k in range(128):
-        desc_img2[i][j][k] = v_desc[0][k]
-    print(str(i))
+      kp = cv2.KeyPoint(i,j,1)
+      kps.append(kp)
+
+  # Descriptors for img1
+  kpu, u_descs = sift.compute(img1,kps)
+
+  # Descriptors for img2
+  kpv, v_descs = sift.compute(img2,kps)
 
   for i in range(h):
     for j in range(w):
-      # retrieve pixel in left image
+      # retrieve desc in left image
       u = img1[i][j]
-      kp = cv2.KeyPoint(i,j,4)
-      _, u_desc = sift.compute(img1,[kp])
+      u_desc = u_descs[i*w+j]
 
-      # use SIFT flow to find d
-      min_idx = 0
+      # find d
       min_d = 100000
 
-      if (u == 0):
-        d = np.square(np.linalg.norm(u_desc))
-      else:
-        for k in range(img2_w):
-          u = img2[i][k]
-          if (u != 0):
-            # kp = cv2.KeyPoint(i,k,1)
-            # _, v_desc = sift.compute(img2,[kp])
-            v_desc = desc_img2[i][k]
+      for k in range(w):
+        v_desc = v_descs[i*w+k]
+        d = np.square(np.linalg.norm(np.subtract(u_desc,v_desc)))
 
-            d = np.square(np.linalg.norm(np.subtract(u_desc,v_desc)))
-            if (d < min_d):
-              min_idx = k
-              min_d = d
-      print(str(i) + ", " + str(j))
+        if (d < min_d):
+          min_d = d
+
       # Add d to final image
-      disparity[i][j] = min_d
+      disparity[i][j] = d
+    print(str(i))
 
   return disparity
 
