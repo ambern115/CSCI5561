@@ -27,9 +27,9 @@ parser = argparse.ArgumentParser(description='Neural style transfer with Keras.'
 #                     help='Prefix for the saved results.')
 parser.add_argument('--iter', type=int, default=10, required=False,
                     help='Number of iterations to run.')
-parser.add_argument('--content_weight', type=float, default=0.02, required=False,
+parser.add_argument('--content_weight', type=float, default=0.5, required=False,
                     help='Content weight.')
-parser.add_argument('--style_weight', type=float, default=4.5, required=False,
+parser.add_argument('--style_weight', type=float, default=1.0, required=False,
                     help='Style weight.')
 parser.add_argument('--tv_weight', type=float, default=0.995, required=False,
                     help='Total Variation weight.')
@@ -39,8 +39,8 @@ args = parser.parse_args()
 # style_reference_image_path = args.style_reference_image_path
 # result_prefix = args.result_prefix
 base_image_path = "TestImages/samplecat_small.jpg"
-style_reference_image_path = "TestImages/compositionvii.jpg"
-result_prefix = "cat1"
+style_reference_image_path = "TestImages/compositionvii_small.jpg"
+result_prefix = "cat2"
 iterations = 10#args.iter
 
 # these are the weights of the different loss components
@@ -50,8 +50,8 @@ content_weight = args.content_weight
 
 # dimensions of the generated picture.
 width, height = load_img(base_image_path).size
-img_nrows = width#400
-img_ncols = height#int(width * img_nrows / height)
+img_nrows = height#400
+img_ncols = width#int(width * img_nrows / height)
 
 # util function to open, resize and format pictures into appropriate tensors
 
@@ -179,7 +179,7 @@ combination_features = layer_features[2, :, :, :]
 loss = loss + content_weight * content_loss(base_image_features,
                                             combination_features)
 
-feature_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1']#, 'block4_conv2', 'block5_conv2']
+feature_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1']
 for layer_name in feature_layers:
     layer_features = outputs_dict[layer_name]
     style_reference_features = layer_features[1, :, :, :]
@@ -252,11 +252,11 @@ evaluator = Evaluator()
 # run scipy-based optimization (L-BFGS) over the pixels of the generated image
 # so as to minimize the neural style loss
 
-#x = preprocess_image(base_image_path)
+x = preprocess_image(style_reference_image_path)
 IMAGE_HEIGHT = img_ncols
 IMAGE_WIDTH = img_nrows
 CHANNELS = 3
-x = np.random.uniform(0, 255, (1, IMAGE_HEIGHT, IMAGE_WIDTH, 3)) - 128.
+#x = np.random.uniform(0, 255, (1, IMAGE_HEIGHT, IMAGE_WIDTH, 3)) - 128.
 
 for i in range(iterations):
     print('Start of iteration', i)
@@ -266,17 +266,17 @@ for i in range(iterations):
                                      fprime=evaluator.grads, maxfun=20)
     print('Current loss value:', min_val)
 
-    x = x.reshape((IMAGE_HEIGHT, IMAGE_WIDTH, CHANNELS))
-    x = x[:, :, ::-1]
-    x[:, :, 0] += IMAGENET_MEAN_RGB_VALUES[2]
-    x[:, :, 1] += IMAGENET_MEAN_RGB_VALUES[1]
-    x[:, :, 2] += IMAGENET_MEAN_RGB_VALUES[0]
-    x = np.clip(x, 0, 255).astype("uint8")
-    output_image = Image.fromarray(x)
+    #x = x.reshape((IMAGE_HEIGHT, IMAGE_WIDTH, CHANNELS))
+    # x = x[:, :, ::-1]
+    # x[:, :, 0] += IMAGENET_MEAN_RGB_VALUES[2]
+    # x[:, :, 1] += IMAGENET_MEAN_RGB_VALUES[1]
+    # x[:, :, 2] += IMAGENET_MEAN_RGB_VALUES[0]
+    # x = np.clip(x, 0, 255).astype("uint8")
+    # output_image = Image.fromarray(x)
     # save current generated image
-    #img = deprocess_image(x.copy())
+    img = deprocess_image(x.copy())
     fname = result_prefix + '_at_iteration_%d.png' % i
-    save_img(fname, output_image)
+    save_img(fname, img)
     end_time = time.time()
     print('Image saved as', fname)
     print('Iteration %d completed in %ds' % (i, end_time - start_time))
